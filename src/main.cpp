@@ -22,6 +22,7 @@ double ** mJobs; // matriz de adjacencia
 double ** mSetupTimes; // matriz reorganizada;
 int n; // quantidade total de vertices
 vector<vector<int>> arrangedMatrix;
+unsigned seed;
 
 const double EulerConstant = std::exp(1.0);
 
@@ -52,9 +53,9 @@ int main(int argc, char** argv) {
         sequencesMatrix[i] = new infoSequence[n+1];
     }
 
-    unsigned seed = time(0);
+    //unsigned seed = time(0);
     //unsigned seed = 1611170583;
-    //seed: 1611410696 exceção de potno flutuante
+    seed = 1611410696; //exceção de potno flutuante
     cout << "\nseed: " << seed << endl;
     srand(seed);
 
@@ -288,15 +289,15 @@ void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t, i
     //double beta = 2;
     //cout << j_t << endl;
 
-    random_device rd;
-    mt19937 gen(rd());
+    //random_device rd;
+    mt19937 gen(seed);
     bernoulli_distribution d(alfa);
 
 
     if(d(gen) == true){ // split string removal
         int m = 1; // qtd jobs preservados
 
-        default_random_engine generator(time(0));
+        default_random_engine generator(seed);
         uniform_real_distribution<double> distribution(0.0,1.0);
 
        // if(distribution(generator) > beta){
@@ -361,7 +362,7 @@ void recreate(vector<int> &s, vector<int> &absentJobs){
 
     int blinkRate = 0;
     
-    default_random_engine generator(time(0));
+    default_random_engine generator(seed);
     uniform_real_distribution<double> distribution(0.0,1.0);
 
     //cout <<  distribution(generator) << endl;
@@ -408,7 +409,7 @@ vector<int> localSearch(vector<int> &s, int nIter, int t_init, int l_s_max, doub
     vector<int> absentJobs;
     int t = t_init;
 
-    default_random_engine generator(time(0));
+    default_random_engine generator(seed);
     uniform_real_distribution<double> distribution(0.0,1.0);
 
 
