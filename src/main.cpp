@@ -1,15 +1,20 @@
 #include "readData.h"
 #include "CustoIn.h"
+#include "infoSeq.h"
 #include <fstream>
 #include <iostream>
 #include <vector>
 #include <ctime>
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <limits>
 #include <random>
 #include <sys/timeb.h>
 #include <sys/resource.h>
+
+#include <iomanip>
+#include <string>
 
 using namespace std;
 
@@ -27,7 +32,7 @@ vector<CustoIn> calculaCusto(vector<int> listaCandidatos, vector<int> &s, double
 bool comp(const CustoIn& a, const CustoIn& b);
 void printSolution(vector<int> solucao, double **mJobs, double ** mSetupTimes);
 void arrangeMatrix(int dimension, double **adjMatrix, vector<vector<int>> &arrangedMatrix);
-void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t);
+void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t, double alfa);
 int genRandomInteger(int min, int max);
 void ruin(vector<int> &s, vector<int> &absentJobs);
 void recreate(vector<int> &s, vector<int> &absentJobs);
@@ -43,21 +48,52 @@ int main(int argc, char** argv) {
     readData(argc, argv, &n, &mJobs, &mSetupTimes);
     arrangeMatrix(n, mSetupTimes, arrangedMatrix);
 
-    unsigned seed = time(0);
+    sequencesMatrix = new infoSequence*[n+1];
+    for(int i = 0; i <= n; ++i){
+        sequencesMatrix[i] = new infoSequence[n+1];
+    }
+
+   /* unsigned seed = time(0);
     //unsigned seed = 1611170583;
     cout << "\nseed: " << seed << endl;
     srand(seed);
 
     s = construction(n, mJobs, mSetupTimes, 0.5, cost);
     printSolution(s, mJobs, mSetupTimes);
-    /*ruin(s, absentJobs);
+    ruin(s, absentJobs);
     printSolution(s, mJobs, mSetupTimes);
     recreate(s, absentJobs);
-    printSolution(s, mJobs, mSetupTimes);*/
+    printSolution(s, mJobs, mSetupTimes);
     s = localSearch(s, 2000000, 100);
     printSolution(s, mJobs, mSetupTimes);
-    cout << "custo = " << sequenceTime(s, mJobs, mSetupTimes) << endl;
+    cout << "custo = " << sequenceTime(s, mJobs, mSetupTimes) << endl;*/
     
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    // give "true" 1/4 of the time
+    // give "false" 3/4 of the time
+    std::bernoulli_distribution d(0.7);
+
+    int vdd = 0;
+    int fake = 0;
+    for(int i = 0; i < 10000; i++){
+        if(d(gen) == true)
+            vdd++;
+        else
+            fake++;
+    }
+    cout << "%true = " << vdd/100 << " %falso = " << fake/100 << endl;
+ 
+   /* std::map<bool, int> hist;
+    for(int n=0; n<10000; ++n) {
+        ++hist[d(gen)];
+    }
+
+    for(auto p : hist) {
+        std::cout << std::boolalpha << std::setw(5) << p.first
+                  << ' ' << std::string(p.second/500, '*') << '\n';
+    }*/
 
 
 
@@ -137,14 +173,14 @@ vector<int> construction(int n, double ** mJobs, double ** mSetupTimes, double a
         
     }
     
-    //setSequencesMatrix(sequencesMatrix,s,n,mJobs,mSetupTimes); // construção da matriz de subsequencias
+    setSequencesMatrix(sequencesMatrix,s,n,mJobs,mSetupTimes); // construção da matriz de subsequencias
     
-    //infoSequence initialSolution;
-    //initialSolution = concatenateSequencev2(mSetupTimes, mJobs, dJob, sequencesMatrix[0][n-1]); // concatena a sequencia com tarefa dummy para computar initial setup
+    infoSequence initialSolution;
+    initialSolution = concatenateSequencev2(mSetupTimes, mJobs, dJob, sequencesMatrix[0][n-1]); // concatena a sequencia com tarefa dummy para computar initial setup
     //idleTime = initialSolution.waitingTime;
-    //cost = initialSolution.initialTime + initialSolution.duration; // custo da solução inicial
+    cost = initialSolution.initialTime + initialSolution.duration; // custo da solução inicial
     //printSolution(s, mJobs, mSetupTimes);
-    cost = sequenceTime(s, mJobs, mSetupTimes);
+    //cost = sequenceTime(s, mJobs, mSetupTimes);
 
     return s; // retorna a sequencia
 }
@@ -255,7 +291,7 @@ void arrangeMatrix(int dimension, double **adjMatrix, vector<vector<int>> &arran
 }
 
 void ruin(vector<int> &s, vector<int> &absentJobs){
-    //int l_s_max = L_max;
+   // int l_s_max = L_max;
     int seedJob = genRandomInteger(1,n);
 
     //for(int i = 0; i < arrangedMatrix[seedJob].size(); i++){
@@ -265,30 +301,81 @@ void ruin(vector<int> &s, vector<int> &absentJobs){
            auto it = find(s.begin(), s.end(), j_t);
            int index_j_t = it - s.begin(); // teste
            int l_t = genRandomInteger(1,s.size()-index_j_t);
-           removeSelected(s, absentJobs, l_t, j_t);
+           removeSelected(s, absentJobs, l_t, j_t, 0.5);
        // }
 
     //}
 }
 
-void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t){
+void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t, double alfa){
 
     int stringEnd;
     int stringBegin;
+    double beta = 2;
     //cout << j_t << endl;
 
     auto it = find(s.begin(), s.end(), j_t);
     int index_j_t = it - s.begin();
     //cout << index_j_t << endl;
-    do{
-        stringBegin = genRandomInteger(max(0,index_j_t-l_t), index_j_t);
-        //cout << "begin: " << stringBegin << endl;
-        stringEnd = stringBegin + l_t;
-        //cout << "end: " << stringEnd << endl;
-    }while(stringEnd > s.size());
 
-    absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + stringEnd);
-    s.erase(s.begin() + stringBegin, s.begin() + stringEnd);
+    random_device rd;
+    mt19937 gen(rd());
+    bernoulli_distribution d(alfa);
+
+
+    if(d(gen) == true){ // split string removal
+        int m = 1; // qtd jobs preservados
+
+        default_random_engine generator(time(0));
+        uniform_real_distribution<double> distribution(0.0,1.0);
+
+        if(distribution(generator) > beta){
+
+            do{
+                stringBegin = genRandomInteger(max(0,index_j_t-l_t), index_j_t); //indice do inicio da string na soluçao
+                //cout << "begin: " << stringBegin << endl;
+                stringEnd = stringBegin + l_t; // indice do fim da string
+                //cout << "end: " << stringEnd << endl;
+            }while(stringEnd > s.size());
+
+            int preservedStringBegin = genRandomInteger(stringBegin, stringEnd - m);
+
+            if(preservedStringBegin == stringBegin){
+                absentJobs.insert(absentJobs.end(), s.begin() + preservedStringBegin + m, s.begin() + stringEnd);
+                s.erase(s.begin() + preservedStringBegin + m, s.begin() + stringEnd);
+            }
+            if(preservedStringBegin == stringEnd - m){
+                absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + stringEnd - m);
+                s.erase(s.begin() + stringBegin, s.begin() + stringEnd - m);
+            }
+            if(preservedStringBegin > stringBegin && preservedStringBegin < stringEnd - m){
+                absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + preservedStringBegin);
+                absentJobs.insert(absentJobs.end(), s.begin() + preservedStringBegin + m, s.begin() + stringEnd);
+                vector<int> preservedString;
+                preservedString.insert(preservedString.end(), s.begin() + preservedStringBegin, s.begin() + preservedStringBegin + m);
+                s.erase(s.begin() + stringBegin, s.begin() + stringEnd);
+                s.insert(s.end(), preservedString.begin(), preservedString.end());
+            }
+
+        }
+
+
+    }
+    else{ //string removal
+
+        do{
+            stringBegin = genRandomInteger(max(0,index_j_t-l_t), index_j_t);
+            //cout << "begin: " << stringBegin << endl;
+            stringEnd = stringBegin + l_t;
+            //cout << "end: " << stringEnd << endl;
+        }while(stringEnd > s.size());
+
+        absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + stringEnd);
+        s.erase(s.begin() + stringBegin, s.begin() + stringEnd);
+    }
+
+
+    
 
 }
 
