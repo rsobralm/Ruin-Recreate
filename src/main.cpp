@@ -32,13 +32,12 @@ vector<CustoIn> calculaCusto(vector<int> listaCandidatos, vector<int> &s, double
 bool comp(const CustoIn& a, const CustoIn& b);
 void printSolution(vector<int> solucao, double **mJobs, double ** mSetupTimes);
 void arrangeMatrix(int dimension, double **adjMatrix, vector<vector<int>> &arrangedMatrix);
-void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t, double alfa);
+void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t, int index_j_t ,double alfa, double beta);
 int genRandomInteger(int min, int max);
-void ruin(vector<int> &s, vector<int> &absentJobs);
+void ruin(vector<int> &s, vector<int> &absentJobs, int l_s_max, double alfa, double beta);
 void recreate(vector<int> &s, vector<int> &absentJobs);
 double costInsertionJob(vector<int> &s, int job, int pos);
-vector<int> localSearch(vector<int> &s, int nIter, int t_init);
-
+vector<int> localSearch(vector<int> &s, int nIter, int t_init, int l_s_max, double alfa, double beta);
 
 int main(int argc, char** argv) {
 
@@ -53,48 +52,21 @@ int main(int argc, char** argv) {
         sequencesMatrix[i] = new infoSequence[n+1];
     }
 
-   /* unsigned seed = time(0);
+    unsigned seed = time(0);
     //unsigned seed = 1611170583;
+    //seed: 1611410696 exceção de potno flutuante
     cout << "\nseed: " << seed << endl;
     srand(seed);
 
-    s = construction(n, mJobs, mSetupTimes, 0.5, cost);
+    s = construction(n, mJobs, mSetupTimes, 0.1, cost);
+    //printSolution(s, mJobs, mSetupTimes);
+    //ruin(s, absentJobs);
+    //printSolution(s, mJobs, mSetupTimes);
+    //recreate(s, absentJobs);
     printSolution(s, mJobs, mSetupTimes);
-    ruin(s, absentJobs);
+    s = localSearch(s, 200000, 100, 5, 0.5, 0.01);
     printSolution(s, mJobs, mSetupTimes);
-    recreate(s, absentJobs);
-    printSolution(s, mJobs, mSetupTimes);
-    s = localSearch(s, 2000000, 100);
-    printSolution(s, mJobs, mSetupTimes);
-    cout << "custo = " << sequenceTime(s, mJobs, mSetupTimes) << endl;*/
-    
-
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    // give "true" 1/4 of the time
-    // give "false" 3/4 of the time
-    std::bernoulli_distribution d(0.7);
-
-    int vdd = 0;
-    int fake = 0;
-    for(int i = 0; i < 10000; i++){
-        if(d(gen) == true)
-            vdd++;
-        else
-            fake++;
-    }
-    cout << "%true = " << vdd/100 << " %falso = " << fake/100 << endl;
- 
-   /* std::map<bool, int> hist;
-    for(int n=0; n<10000; ++n) {
-        ++hist[d(gen)];
-    }
-
-    for(auto p : hist) {
-        std::cout << std::boolalpha << std::setw(5) << p.first
-                  << ' ' << std::string(p.second/500, '*') << '\n';
-    }*/
-
+    cout << "custo = " << sequenceTime(s, mJobs, mSetupTimes) << endl;
 
 
     return 0;
@@ -290,7 +262,7 @@ void arrangeMatrix(int dimension, double **adjMatrix, vector<vector<int>> &arran
 
 }
 
-void ruin(vector<int> &s, vector<int> &absentJobs){
+void ruin(vector<int> &s, vector<int> &absentJobs, int l_s_max, double alfa, double beta){
    // int l_s_max = L_max;
     int seedJob = genRandomInteger(1,n);
 
@@ -298,25 +270,23 @@ void ruin(vector<int> &s, vector<int> &absentJobs){
      //   int j = arrangedMatrix[seedJob][i];
      //   if(absentJobs.empty() || (j != seedJob && absentJobs.end() != find(absentJobs.begin(), absentJobs.end(), j))){
            int j_t = seedJob;
+
            auto it = find(s.begin(), s.end(), j_t);
-           int index_j_t = it - s.begin(); // teste
-           int l_t = genRandomInteger(1,s.size()-index_j_t);
-           removeSelected(s, absentJobs, l_t, j_t, 0.5);
+           int index_j_t = it - s.begin();
+
+           int l_t = genRandomInteger(1, min((int)s.size()-index_j_t, l_s_max));
+           removeSelected(s, absentJobs, l_t, j_t, index_j_t, alfa, beta);
        // }
 
     //}
 }
 
-void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t, double alfa){
+void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t, int index_j_t, double alfa, double beta){
 
     int stringEnd;
     int stringBegin;
-    double beta = 2;
+    //double beta = 2;
     //cout << j_t << endl;
-
-    auto it = find(s.begin(), s.end(), j_t);
-    int index_j_t = it - s.begin();
-    //cout << index_j_t << endl;
 
     random_device rd;
     mt19937 gen(rd());
@@ -329,34 +299,37 @@ void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t, d
         default_random_engine generator(time(0));
         uniform_real_distribution<double> distribution(0.0,1.0);
 
-        if(distribution(generator) > beta){
+       // if(distribution(generator) > beta){
 
-            do{
-                stringBegin = genRandomInteger(max(0,index_j_t-l_t), index_j_t); //indice do inicio da string na soluçao
-                //cout << "begin: " << stringBegin << endl;
-                stringEnd = stringBegin + l_t; // indice do fim da string
-                //cout << "end: " << stringEnd << endl;
-            }while(stringEnd > s.size());
+        while(distribution(generator) < beta && m < s.size() - l_t){
+            m++;
+        }
+        
 
-            int preservedStringBegin = genRandomInteger(stringBegin, stringEnd - m);
+        do{
+            stringBegin = genRandomInteger(max(0,index_j_t-l_t), index_j_t); //indice do inicio da string na soluçao
+            //cout << "begin: " << stringBegin << endl;
+            stringEnd = stringBegin + l_t; // indice do fim da string
+            //cout << "end: " << stringEnd << endl;
+        }while(stringEnd > s.size());
 
-            if(preservedStringBegin == stringBegin){
-                absentJobs.insert(absentJobs.end(), s.begin() + preservedStringBegin + m, s.begin() + stringEnd);
-                s.erase(s.begin() + preservedStringBegin + m, s.begin() + stringEnd);
-            }
-            if(preservedStringBegin == stringEnd - m){
-                absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + stringEnd - m);
-                s.erase(s.begin() + stringBegin, s.begin() + stringEnd - m);
-            }
-            if(preservedStringBegin > stringBegin && preservedStringBegin < stringEnd - m){
-                absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + preservedStringBegin);
-                absentJobs.insert(absentJobs.end(), s.begin() + preservedStringBegin + m, s.begin() + stringEnd);
-                vector<int> preservedString;
-                preservedString.insert(preservedString.end(), s.begin() + preservedStringBegin, s.begin() + preservedStringBegin + m);
-                s.erase(s.begin() + stringBegin, s.begin() + stringEnd);
-                s.insert(s.end(), preservedString.begin(), preservedString.end());
-            }
+        int preservedStringBegin = genRandomInteger(stringBegin, stringEnd - m);
 
+        if(preservedStringBegin == stringBegin){
+            absentJobs.insert(absentJobs.end(), s.begin() + preservedStringBegin + m, s.begin() + stringEnd);
+            s.erase(s.begin() + preservedStringBegin + m, s.begin() + stringEnd);
+        }
+        if(preservedStringBegin == stringEnd - m){
+            absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + stringEnd - m);
+            s.erase(s.begin() + stringBegin, s.begin() + stringEnd - m);
+        }
+        if(preservedStringBegin > stringBegin && preservedStringBegin < stringEnd - m){
+            absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + preservedStringBegin);
+            absentJobs.insert(absentJobs.end(), s.begin() + preservedStringBegin + m, s.begin() + stringEnd);
+            vector<int> preservedString;
+            preservedString.insert(preservedString.end(), s.begin() + preservedStringBegin, s.begin() + preservedStringBegin + m);
+            s.erase(s.begin() + stringBegin, s.begin() + stringEnd);
+            s.insert(s.end(), preservedString.begin(), preservedString.end());
         }
 
 
@@ -429,7 +402,7 @@ double costInsertionJob(vector<int> &s, int job, int pos){
     return sequenceTime(s_1, mJobs, mSetupTimes);
 }
 
-vector<int> localSearch(vector<int> &s, int nIter, int t_init){
+vector<int> localSearch(vector<int> &s, int nIter, int t_init, int l_s_max, double alfa, double beta){
     
     vector<int> s_best = s;
     vector<int> absentJobs;
@@ -441,7 +414,7 @@ vector<int> localSearch(vector<int> &s, int nIter, int t_init){
 
     for(int i = 0; i < nIter; i++){
         vector<int> s_star = s;
-        ruin(s_star, absentJobs);
+        ruin(s_star, absentJobs, l_s_max, alfa, beta);
         recreate(s_star, absentJobs);
         if(sequenceTime(s_star, mJobs, mSetupTimes) < sequenceTime(s, mJobs, mSetupTimes) - t*log(distribution(generator)))
             s = s_star;
