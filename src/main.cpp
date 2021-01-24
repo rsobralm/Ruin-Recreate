@@ -53,19 +53,23 @@ int main(int argc, char** argv) {
         sequencesMatrix[i] = new infoSequence[n+1];
     }
 
-    //unsigned seed = time(0);
+    seed = time(0);
     //unsigned seed = 1611170583;
-    seed = 1611410696; //exceção de potno flutuante
+    //seed = 1611495465; 
+    //seed = 1611497795;
+    //seed = 1611500157;
+    //seed =  1611503946; // seg fault
+    //seed = 1611504278; // seg fault again
     cout << "\nseed: " << seed << endl;
     srand(seed);
 
     s = construction(n, mJobs, mSetupTimes, 0.1, cost);
-    //printSolution(s, mJobs, mSetupTimes);
-    //ruin(s, absentJobs);
+    printSolution(s, mJobs, mSetupTimes);
+    //ruin(s, absentJobs, 10, 0.5, 0.1);
     //printSolution(s, mJobs, mSetupTimes);
     //recreate(s, absentJobs);
-    printSolution(s, mJobs, mSetupTimes);
-    s = localSearch(s, 200000, 100, 5, 0.5, 0.01);
+    //printSolution(s, mJobs, mSetupTimes);
+    s = localSearch(s, 200000, 100, 5, 1, 0.01);
     printSolution(s, mJobs, mSetupTimes);
     cout << "custo = " << sequenceTime(s, mJobs, mSetupTimes) << endl;
 
@@ -286,6 +290,7 @@ void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t, i
 
     int stringEnd;
     int stringBegin;
+    //int m;
     //double beta = 2;
     //cout << j_t << endl;
 
@@ -312,26 +317,33 @@ void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t, i
             //cout << "begin: " << stringBegin << endl;
             stringEnd = stringBegin + l_t; // indice do fim da string
             //cout << "end: " << stringEnd << endl;
-        }while(stringEnd > s.size());
+        }while(stringEnd >= s.size());
 
         int preservedStringBegin = genRandomInteger(stringBegin, stringEnd - m);
 
+       // cout <<"m =  " << m << " begin = " << stringBegin << " end = " << stringEnd << " mBegin = " << preservedStringBegin << endl;
+
         if(preservedStringBegin == stringBegin){
-            absentJobs.insert(absentJobs.end(), s.begin() + preservedStringBegin + m, s.begin() + stringEnd);
-            s.erase(s.begin() + preservedStringBegin + m, s.begin() + stringEnd);
+            absentJobs.insert(absentJobs.end(), s.begin() + preservedStringBegin + m, s.begin() + stringEnd + 1);
+            s.erase(s.begin() + preservedStringBegin + m, s.begin() + stringEnd + 1);
         }
-        if(preservedStringBegin == stringEnd - m){
-            absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + stringEnd - m);
-            s.erase(s.begin() + stringBegin, s.begin() + stringEnd - m);
+        if(preservedStringBegin - 1 == stringEnd - m){
+            absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + stringEnd - m + 1);
+            s.erase(s.begin() + stringBegin, s.begin() + stringEnd - m + 1);
         }
-        if(preservedStringBegin > stringBegin && preservedStringBegin < stringEnd - m){
+        if(preservedStringBegin > stringBegin && preservedStringBegin <= stringEnd - m){
             absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + preservedStringBegin);
-            absentJobs.insert(absentJobs.end(), s.begin() + preservedStringBegin + m, s.begin() + stringEnd);
-            vector<int> preservedString;
-            preservedString.insert(preservedString.end(), s.begin() + preservedStringBegin, s.begin() + preservedStringBegin + m);
-            s.erase(s.begin() + stringBegin, s.begin() + stringEnd);
-            s.insert(s.end(), preservedString.begin(), preservedString.end());
+            absentJobs.insert(absentJobs.end(), s.begin() + preservedStringBegin + m, s.begin() + stringEnd + 1);
+            s.erase(s.begin() + stringBegin, s.begin() + preservedStringBegin);
+            s.erase(s.begin() + stringBegin + m, s.begin() + stringEnd - preservedStringBegin + stringBegin + 1);
+
         }
+
+        /*cout << "absent = ";
+        for (int i = 0; i < absentJobs.size(); i++){
+            cout << absentJobs[i] << " ";
+        }
+        cout << endl;*/
 
 
     }
@@ -342,10 +354,15 @@ void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t, i
             //cout << "begin: " << stringBegin << endl;
             stringEnd = stringBegin + l_t;
             //cout << "end: " << stringEnd << endl;
-        }while(stringEnd > s.size());
+        }while(stringEnd >= s.size());
 
-        absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + stringEnd);
-        s.erase(s.begin() + stringBegin, s.begin() + stringEnd);
+        //cout <<" begin = " << stringBegin << " end = " << stringEnd << endl;
+
+
+        absentJobs.insert(absentJobs.end(), s.begin() + stringBegin, s.begin() + stringEnd + 1);
+        s.erase(s.begin() + stringBegin, s.begin() + stringEnd + 1);
+
+    
     }
 
 
