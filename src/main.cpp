@@ -39,6 +39,7 @@ void ruin(vector<int> &s, vector<int> &absentJobs, int l_s_max, double alfa, dou
 void recreate(vector<int> &s, vector<int> &absentJobs);
 double costInsertionJob(vector<int> &s, int job, int pos);
 vector<int> localSearch(vector<int> &s, int nIter, int t_init, int l_s_max, double alfa, double beta);
+vector<int> sisr_ruin_recreate(vector<int> s, int l_s_max, int alfa, int beta);
 
 int main(int argc, char** argv) {
 
@@ -69,7 +70,7 @@ int main(int argc, char** argv) {
     //printSolution(s, mJobs, mSetupTimes);
     //recreate(s, absentJobs);
     //printSolution(s, mJobs, mSetupTimes);
-    s = localSearch(s, 200000, 100, 5, 1, 0.01);
+    s = localSearch(s, 2000000, 100, 5, 1, 0.01);
     printSolution(s, mJobs, mSetupTimes);
     cout << "custo = " << sequenceTime(s, mJobs, mSetupTimes) << endl;
 
@@ -281,6 +282,7 @@ void ruin(vector<int> &s, vector<int> &absentJobs, int l_s_max, double alfa, dou
 
            int l_t = genRandomInteger(1, min((int)s.size()-index_j_t, l_s_max));
            removeSelected(s, absentJobs, l_t, j_t, index_j_t, alfa, beta);
+           setSequencesMatrix(sequencesMatrix, s, s.size(), mJobs, mSetupTimes);
        // }
 
     //}
@@ -405,43 +407,120 @@ void recreate(vector<int> &s, vector<int> &absentJobs){
         //cout << s.size() << endl;
         s.insert(s.begin() + best_pos, j);
         absentJobs.pop_back();
+
+        //atualização da matriz de subsequencias
+
+        /*infoSequence jobSeq; // subsequencia unitária com o job a ser inserido;
+
+        jobSeq.initialTime = mJobs[j][1];
+        jobSeq.duration = mJobs[j][2];
+        jobSeq.firstJob = j;
+        jobSeq.lastJob = j;*/
+
+         for(int i = 0; i < n; i++){
+            sequencesMatrix[i][i].firstJob = s[i];
+            sequencesMatrix[i][i].lastJob = s[i];
+            sequencesMatrix[i][i].duration = mJobs[s[i]][2];
+            sequencesMatrix[i][i].initialTime = mJobs[s[i]][1];
+        }
+
+        for(int l = 0; l < best_pos; l++){
+            for(int m = best_pos; m < s.size(); m++){
+                sequencesMatrix[l][m] = concatenateSequencev2(mSetupTimes, mJobs, sequencesMatrix[l][m-1], sequencesMatrix[m][m]);
+                sequencesMatrix[m][l] = concatenateSequencev2(mSetupTimes, mJobs, sequencesMatrix[m][m], sequencesMatrix[l][m-1]);
+            }
+            
+        }
     }
 }
 
 double costInsertionJob(vector<int> &s, int job, int pos){
-    vector<int> s_1 = s;
-    s_1.insert(s_1.begin() + pos, job);
-
-    /*if(s_1.size() == 1)
-        return */
+    //vector<int> s_1 = s;
+    //s_1.insert(s_1.begin() + pos, job);
 
     //printSolution(s_1, mJobs, mSetupTimes);
 
-    return sequenceTime(s_1, mJobs, mSetupTimes);
+    //return sequenceTime(s_1, mJobs, mSetupTimes);
+    
+    infoSequence dummyJob;
+    infoSequence seq;
+    infoSequence jobSeq; // subsequencia unitária com o job a ser inserido;
+
+    jobSeq.initialTime = mJobs[job][1];
+    jobSeq.duration = mJobs[job][2];
+    jobSeq.firstJob = job;
+    jobSeq.lastJob = job;
+
+    dummyJob.initialTime = 0;
+    dummyJob.duration = 0;
+    dummyJob.firstJob = 0;
+    dummyJob.lastJob = 0;
+
+
+    if(pos != 0)
+        seq = concatenateSequencev2(mSetupTimes, mJobs, dummyJob, sequencesMatrix[0][pos-1]);
+    else
+        seq = concatenateSequencev2(mSetupTimes, mJobs, dummyJob, jobSeq);
+
+    if(pos != 0 && pos != s.size() - 1)
+        seq = concatenateSequencev2(mSetupTimes, mJobs, seq, jobSeq);
+
+    if(pos != s.size() - 1)
+        seq = concatenateSequencev2(mSetupTimes, mJobs, seq, sequencesMatrix[pos][s.size()]);
+    else
+        seq = concatenateSequencev2(mSetupTimes, mJobs, seq, jobSeq);
+
+
+   /* seq = concatenateSequencev2(mSetupTimes, mJobs, dummyJob, sequencesMatrix[0][pos-1]);
+    seq = concatenateSequencev2(mSetupTimes, mJobs, seq, jobSeq);
+    seq = concatenateSequencev2(mSetupTimes, mJobs, seq, sequencesMatrix[pos][s.size()]);
+
+    if(pos == 0)
+        seq = concatenateSequencev2(mSetupTimes, mJobs, dummyJob, jobSeq);
+        seq = concatenateSequencev2(mSetupTimes, mJobs, seq, sequencesMatrix[pos][s.size()]);
+
+    if(pos == s.size() - 1)
+        seq = concatenateSequencev2(mSetupTimes, mJobs, dummyJob, sequencesMatrix[0][pos-1]);
+        seq = concatenateSequencev2(mSetupTimes, mJobs, seq, jobSeq);*/
+
+
+    return seq.initialTime + seq.duration;
+
 }
 
 vector<int> localSearch(vector<int> &s, int nIter, int t_init, int l_s_max, double alfa, double beta){
     
-    vector<int> s_best = s;
-    vector<int> absentJobs;
+    vector<int> bestSolution = s;
+    vector<int> iterationSolution;
+    //vector<int> absentJobs;
     int t = t_init;
 
     default_random_engine generator(seed);
     uniform_real_distribution<double> distribution(0.0,1.0);
-
-
+    
     for(int i = 0; i < nIter; i++){
-        vector<int> s_star = s;
-        ruin(s_star, absentJobs, l_s_max, alfa, beta);
-        recreate(s_star, absentJobs);
-        if(sequenceTime(s_star, mJobs, mSetupTimes) < sequenceTime(s, mJobs, mSetupTimes) - t*log(distribution(generator)))
-            s = s_star;
-        if(sequenceTime(s_star, mJobs, mSetupTimes) < sequenceTime(s_best, mJobs, mSetupTimes))
-            s_best = s_star;
+        vector<int> absentJobs;
+        iterationSolution = sisr_ruin_recreate(s, l_s_max, alfa, beta);
+        if(sequenceTime(iterationSolution, mJobs, mSetupTimes) < sequenceTime(s, mJobs, mSetupTimes) - t*log(distribution(generator)))
+            s = iterationSolution;
+        if(sequenceTime(iterationSolution, mJobs, mSetupTimes) < sequenceTime(bestSolution, mJobs, mSetupTimes))
+            bestSolution = iterationSolution;
+
+        //iterationSolution = s;
         
         t = t*0.25;
     }
 
-    return s_best;
+    return bestSolution;
 
+}
+
+vector<int> sisr_ruin_recreate(vector<int> s, int l_s_max, int alfa, int beta){
+    vector<int> absentJobs;
+
+    ruin(s, absentJobs, l_s_max, alfa, beta);
+    recreate(s, absentJobs);
+
+
+    return s;
 }
