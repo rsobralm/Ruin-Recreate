@@ -36,10 +36,11 @@ void arrangeMatrix(int dimension, double **adjMatrix, vector<vector<int>> &arran
 void removeSelected(vector<int> &s, vector<int> &absentJobs, int l_t, int j_t, int index_j_t ,double alfa, double beta);
 int genRandomInteger(int min, int max);
 void ruin(vector<int> &s, vector<int> &absentJobs, int l_s_max, double alfa, double beta);
-void recreate(vector<int> &s, vector<int> &absentJobs);
+void recreate(vector<int> &s, double &mkspan, vector<int> &absentJobs);
 double costInsertionJob(vector<int> &s, int job, int pos);
-vector<int> localSearch(vector<int> &s, int nIter, int t_init, int l_s_max, double alfa, double beta);
-vector<int> sisr_ruin_recreate(vector<int> s, int l_s_max, int alfa, int beta);
+vector<int> localSearch(vector<int> &s, double &mkspan, int nIter, int t_init, int l_s_max, double alfa, double beta);
+vector<int> sisr_ruin_recreate(vector<int> s, double &mkspan ,int l_s_max, int alfa, int beta);
+double realcostInsertionJob(vector<int> &s, int job, int pos);
 
 int main(int argc, char** argv) {
 
@@ -61,18 +62,25 @@ int main(int argc, char** argv) {
     //seed = 1611500157;
     //seed =  1611503946; // seg fault
     //seed = 1611504278; // seg fault again
+    //seed = 1611778693;
     cout << "\nseed: " << seed << endl;
     srand(seed);
 
-    s = construction(n, mJobs, mSetupTimes, 0.1, cost);
+    double makespan;
+    s = construction(n, mJobs, mSetupTimes, 0.1, makespan);
     printSolution(s, mJobs, mSetupTimes);
     //ruin(s, absentJobs, 10, 0.5, 0.1);
     //printSolution(s, mJobs, mSetupTimes);
     //recreate(s, absentJobs);
     //printSolution(s, mJobs, mSetupTimes);
-    s = localSearch(s, 2000000, 100, 5, 1, 0.01);
+    
+    s = localSearch(s, makespan ,1000000, 100, 5, 1, 0.01);
     printSolution(s, mJobs, mSetupTimes);
-    cout << "custo = " << sequenceTime(s, mJobs, mSetupTimes) << endl;
+    cout << "custo = " << makespan << endl;
+
+    /*s = {1,2,3,4,5,6};
+    s.insert(s.begin()+6, 7);
+    printSolution(s, mJobs, mSetupTimes);*/
 
 
     return 0;
@@ -377,7 +385,7 @@ int genRandomInteger(int min, int max){
 }
 
 
-void recreate(vector<int> &s, vector<int> &absentJobs){
+void recreate(vector<int> &s, double &mkspan, vector<int> &absentJobs){
 
     int blinkRate = 0;
     
@@ -393,20 +401,31 @@ void recreate(vector<int> &s, vector<int> &absentJobs){
 
         if(s.size() == 0)
             best_pos = 0;
+
+        double costInsertionInPos;
+        double costInsertionBestPos;
         
         //printSolution(s, mJobs, mSetupTimes);
-        for(int k = 0; k < s.size(); k++){
+        for(int k = 0; k <= s.size(); k++){
             //cout << "k = " << k << endl;
             //cout << "j = " << j << endl;
             if(distribution(generator) < 1 - blinkRate){
-                if(best_pos == -1 || costInsertionJob(s, j, k) < costInsertionJob(s, j, best_pos)){
+               /* double calc = costInsertionJob(s, j, k);
+                double real = realcostInsertionJob(s, j, k);
+                    if(calc != real)
+                        cout << "calc: " << calc << " real: " << real <<" pos =  " << k << " j = " << j << " size = " << s.size() << endl;*/
+                costInsertionInPos = costInsertionJob(s, j, k);
+                if(best_pos == -1 || costInsertionInPos < costInsertionBestPos){   
                     best_pos = k;
+                    costInsertionBestPos = costInsertionInPos;
                 }
             } 
         }
         //cout << s.size() << endl;
         s.insert(s.begin() + best_pos, j);
+        //cout << "best_pos: "<< best_pos << endl;
         absentJobs.pop_back();
+        mkspan = costInsertionBestPos;
 
         //atualização da matriz de subsequencias
 
@@ -417,7 +436,7 @@ void recreate(vector<int> &s, vector<int> &absentJobs){
         jobSeq.firstJob = j;
         jobSeq.lastJob = j;*/
 
-         for(int i = 0; i < n; i++){
+        /* for(int i = 0; i < n; i++){
             sequencesMatrix[i][i].firstJob = s[i];
             sequencesMatrix[i][i].lastJob = s[i];
             sequencesMatrix[i][i].duration = mJobs[s[i]][2];
@@ -430,8 +449,20 @@ void recreate(vector<int> &s, vector<int> &absentJobs){
                 sequencesMatrix[m][l] = concatenateSequencev2(mSetupTimes, mJobs, sequencesMatrix[m][m], sequencesMatrix[l][m-1]);
             }
             
-        }
+        }*/
+
+        setSequencesMatrix(sequencesMatrix, s, s.size(), mJobs, mSetupTimes);
     }
+
+}
+
+double realcostInsertionJob(vector<int> &s, int job, int pos){
+    vector<int> s_1 = s;
+    s_1.insert(s_1.begin() + pos, job);
+
+    //printSolution(s_1, mJobs, mSetupTimes);
+
+    return sequenceTime(s_1, mJobs, mSetupTimes);
 }
 
 double costInsertionJob(vector<int> &s, int job, int pos){
@@ -457,7 +488,7 @@ double costInsertionJob(vector<int> &s, int job, int pos){
     dummyJob.lastJob = 0;
 
 
-    if(pos != 0)
+   /* if(pos != 0)
         seq = concatenateSequencev2(mSetupTimes, mJobs, dummyJob, sequencesMatrix[0][pos-1]);
     else
         seq = concatenateSequencev2(mSetupTimes, mJobs, dummyJob, jobSeq);
@@ -469,29 +500,36 @@ double costInsertionJob(vector<int> &s, int job, int pos){
         seq = concatenateSequencev2(mSetupTimes, mJobs, seq, sequencesMatrix[pos][s.size()]);
     else
         seq = concatenateSequencev2(mSetupTimes, mJobs, seq, jobSeq);
+    */
 
 
-   /* seq = concatenateSequencev2(mSetupTimes, mJobs, dummyJob, sequencesMatrix[0][pos-1]);
-    seq = concatenateSequencev2(mSetupTimes, mJobs, seq, jobSeq);
-    seq = concatenateSequencev2(mSetupTimes, mJobs, seq, sequencesMatrix[pos][s.size()]);
-
-    if(pos == 0)
-        seq = concatenateSequencev2(mSetupTimes, mJobs, dummyJob, jobSeq);
-        seq = concatenateSequencev2(mSetupTimes, mJobs, seq, sequencesMatrix[pos][s.size()]);
-
-    if(pos == s.size() - 1)
+    if(pos != 0  && pos != s.size()){
         seq = concatenateSequencev2(mSetupTimes, mJobs, dummyJob, sequencesMatrix[0][pos-1]);
-        seq = concatenateSequencev2(mSetupTimes, mJobs, seq, jobSeq);*/
+        seq = concatenateSequencev2(mSetupTimes, mJobs, seq, jobSeq);
+        seq = concatenateSequencev2(mSetupTimes, mJobs, seq, sequencesMatrix[pos][s.size()-1]);
+   }
+
+    if(pos == 0){
+        seq = concatenateSequencev2(mSetupTimes, mJobs, dummyJob, jobSeq);
+        seq = concatenateSequencev2(mSetupTimes, mJobs, seq, sequencesMatrix[pos][s.size()-1]);
+    }
+
+    if(pos == s.size()){
+        seq = concatenateSequencev2(mSetupTimes, mJobs, dummyJob, sequencesMatrix[0][pos-1]);
+        seq = concatenateSequencev2(mSetupTimes, mJobs, seq, jobSeq);
+    }
 
 
     return seq.initialTime + seq.duration;
 
 }
 
-vector<int> localSearch(vector<int> &s, int nIter, int t_init, int l_s_max, double alfa, double beta){
+vector<int> localSearch(vector<int> &s, double &mkspan, int nIter, int t_init, int l_s_max, double alfa, double beta){
     
     vector<int> bestSolution = s;
+    double bestCost = mkspan;
     vector<int> iterationSolution;
+    double iterationCost;
     //vector<int> absentJobs;
     int t = t_init;
 
@@ -500,26 +538,30 @@ vector<int> localSearch(vector<int> &s, int nIter, int t_init, int l_s_max, doub
     
     for(int i = 0; i < nIter; i++){
         vector<int> absentJobs;
-        iterationSolution = sisr_ruin_recreate(s, l_s_max, alfa, beta);
-        if(sequenceTime(iterationSolution, mJobs, mSetupTimes) < sequenceTime(s, mJobs, mSetupTimes) - t*log(distribution(generator)))
+        //cout << "iter "<< i << endl;
+        iterationSolution = sisr_ruin_recreate(s, iterationCost, l_s_max, alfa, beta);
+        if(iterationCost < mkspan - t*log(distribution(generator))){
             s = iterationSolution;
-        if(sequenceTime(iterationSolution, mJobs, mSetupTimes) < sequenceTime(bestSolution, mJobs, mSetupTimes))
+            mkspan = iterationCost;
+        }
+        if(iterationCost < bestCost){
             bestSolution = iterationSolution;
-
+            bestCost = iterationCost;
+        }
         //iterationSolution = s;
         
-        t = t*0.25;
+        t = t*0.01;
     }
 
     return bestSolution;
 
 }
 
-vector<int> sisr_ruin_recreate(vector<int> s, int l_s_max, int alfa, int beta){
+vector<int> sisr_ruin_recreate(vector<int> s, double &mkspan ,int l_s_max, int alfa, int beta){
     vector<int> absentJobs;
 
     ruin(s, absentJobs, l_s_max, alfa, beta);
-    recreate(s, absentJobs);
+    recreate(s, mkspan, absentJobs);
 
 
     return s;
